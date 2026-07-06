@@ -8,30 +8,19 @@ app.use(express.json());
 
 /*
 ====================================
-MYSQL CONNECTION
+MYSQL POOL CONNECTION
 ====================================
 */
 
-const db = mysql.createConnection({
+const db = mysql.createPool({
   host: process.env.MYSQLHOST,
   user: process.env.MYSQLUSER,
   password: process.env.MYSQLPASSWORD,
   database: process.env.MYSQLDATABASE,
-  port: process.env.MYSQLPORT
-});
-
-db.connect((err) => {
-
-  if (err) {
-
-    console.error("MYSQL CONNECTION ERROR:");
-    console.error(err);
-
-    return;
-  }
-
-  console.log("MySQL Connected Successfully");
-
+  port: process.env.MYSQLPORT,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
 });
 
 /*
@@ -151,7 +140,7 @@ app.post("/verify-license", (req, res) => {
 
     /*
     ==========================
-    HWID FIRST BIND
+    FIRST HWID BIND
     ==========================
     */
 
