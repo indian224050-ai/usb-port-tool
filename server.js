@@ -8,30 +8,19 @@ app.use(express.json());
 
 /*
 ====================================
-MYSQL CONNECTION
+MYSQL POOL CONNECTION
 ====================================
 */
 
-const db = mysql.createConnection({
+const db = mysql.createPool({
   host: process.env.MYSQLHOST,
   user: process.env.MYSQLUSER,
   password: process.env.MYSQLPASSWORD,
   database: process.env.MYSQLDATABASE,
-  port: process.env.MYSQLPORT
-});
-
-db.connect((err) => {
-
-  if (err) {
-
-    console.error("MYSQL CONNECTION ERROR:");
-    console.error(err);
-
-    return;
-  }
-
-  console.log("MySQL Connected Successfully");
-
+  port: process.env.MYSQLPORT,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
 });
 
 /*
@@ -57,6 +46,8 @@ app.post("/generate-license", (req, res) => {
   const licenseKey =
     crypto.randomBytes(16).toString("hex");
 
+  console.log("Generated License:", licenseKey);
+
   const sql =
     "INSERT INTO licenses (license_key, status) VALUES (?, ?)";
 
@@ -67,12 +58,14 @@ app.post("/generate-license", (req, res) => {
 
       if (err) {
 
-        console.log("GENERATE LICENSE ERROR:");
+        console.log("========== MYSQL ERROR ==========");
         console.log(err);
+        console.log("=================================");
 
         return res.json({
           success: false,
-          error: err.message
+          error: err.message,
+          full_error: err
         });
 
       }
@@ -136,7 +129,7 @@ app.post("/verify-license", (req, res) => {
 
     /*
     ==========================
-    STATUS CHECK
+    LICENSE STATUS CHECK
     ==========================
     */
 
@@ -151,7 +144,7 @@ app.post("/verify-license", (req, res) => {
 
     /*
     ==========================
-    HWID FIRST BIND
+    FIRST HWID BIND
     ==========================
     */
 
@@ -186,7 +179,7 @@ app.post("/verify-license", (req, res) => {
 
     /*
     ==========================
-    SUCCESS
+    LICENSE VALID
     ==========================
     */
 
