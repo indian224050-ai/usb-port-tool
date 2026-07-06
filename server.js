@@ -3,7 +3,14 @@ const mysql = require("mysql2");
 const crypto = require("crypto");
 
 const app = express();
+
 app.use(express.json());
+
+/*
+====================================
+MYSQL CONNECTION
+====================================
+*/
 
 const db = mysql.createConnection({
   host: process.env.MYSQLHOST,
@@ -14,66 +21,142 @@ const db = mysql.createConnection({
 });
 
 db.connect((err) => {
+
   if (err) {
-    console.log("Database Error:", err);
-  } else {
-    console.log("MySQL Connected");
+
+    console.error("MYSQL CONNECTION ERROR:");
+    console.error(err);
+
+    return;
   }
+
+  console.log("MySQL Connected Successfully");
+
 });
+
+/*
+====================================
+HOME ROUTE
+====================================
+*/
 
 app.get("/", (req, res) => {
+
   res.send("Xport USB License Server Running");
+
 });
+
+/*
+====================================
+GENERATE LICENSE
+====================================
+*/
 
 app.post("/generate-license", (req, res) => {
-  const key = crypto.randomBytes(16).toString("hex");
 
-  const sql = `
-    INSERT INTO licenses
-    (license_key, status)
-    VALUES (?, ?)
-  `;
+  const licenseKey =
+    crypto.randomBytes(16).toString("hex");
 
-  db.query(sql, [key, "active"], (err) => {
-    if (err) {
+  const sql =
+    "INSERT INTO licenses (license_key, status) VALUES (?, ?)";
+
+  db.query(
+    sql,
+    [licenseKey, "active"],
+    (err, result) => {
+
+      if (err) {
+
+        console.log("GENERATE LICENSE ERROR:");
+        console.log(err);
+
+        return res.json({
+          success: false,
+          error: err.message
+        });
+
+      }
+
       return res.json({
-        success: false,
-        error: err
+        success: true,
+        license: licenseKey
       });
-    }
 
-    res.json({
-      success: true,
-      license: key
-    });
-  });
+    }
+  );
+
 });
 
+/*
+====================================
+VERIFY LICENSE
+====================================
+*/
+
 app.post("/verify-license", (req, res) => {
+
   const { license_key, hwid } = req.body;
 
-  const sql = `
-    SELECT * FROM licenses
-    WHERE license_key=?
-  `;
+  if (!license_key || !hwid) {
 
-  db.query(sql, [license_key], (err, result) => {
+    return res.json({
+      success: false,
+      message: "Missing license_key or hwid"
+    });
+
+  }
+
+  const sql =
+    "SELECT * FROM licenses WHERE license_key=?";
+
+  db.query(sql, [license_key], (err, results) => {
+
     if (err) {
+
+      console.log("VERIFY LICENSE ERROR:");
+      console.log(err);
+
       return res.json({
-        success: false
+        success: false,
+        error: err.message
       });
+
     }
 
-    if (result.length === 0) {
+    if (results.length === 0) {
+
       return res.json({
         success: false,
         message: "Invalid License"
       });
+
     }
 
-    const license = result[0];
+    const license = results[0];
+
+    /*
+    ==========================
+    STATUS CHECK
+    ==========================
+    */
+
+    if (license.status !== "active") {
+
+      return res.json({
+        success: false,
+        message: "License Disabled"
+      });
+
+    }
+
+    /*
+    ==========================
+    HWID FIRST BIND
+    ==========================
+    */
 
     if (!license.hwid) {
+
       db.query(
         "UPDATE licenses SET hwid=? WHERE license_key=?",
         [hwid, license_key]
@@ -83,24 +166,49 @@ app.post("/verify-license", (req, res) => {
         success: true,
         message: "Activated First Time"
       });
+
     }
 
+    /*
+    ==========================
+    HWID CHECK
+    ==========================
+    */
+
     if (license.hwid !== hwid) {
+
       return res.json({
         success: false,
         message: "License Already Used"
       });
+
     }
 
-    res.json({
+    /*
+    ==========================
+    SUCCESS
+    ==========================
+    */
+
+    return res.json({
       success: true,
       message: "License Valid"
     });
+
   });
+
 });
+
+/*
+====================================
+SERVER START
+====================================
+*/
 
 const PORT = process.env.PORT || 8080;
 
-app.listen(PORT, () => {
-  console.log("Server running on port", PORT);
+app.listen(PORT, "0.0.0.0", () => {
+
+  console.log(`Server running on port ${PORT}`);
+
 });
