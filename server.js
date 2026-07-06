@@ -2,35 +2,12 @@ const express = require('express');
 
 const app = express();
 
-app.use(express.json());
-
 app.get('/', (req, res) => {
-    res.send('Xport USB Server Running');
-});
-
-app.post('/verify-license', (req, res) => {
-
-    const { license } = req.body;
-
-    if (license === "TEST123") {
-
-        return res.json({
-            success: true,
-            ip: req.ip,
-            port: 7575
-        });
-
-    }
-
-    return res.json({
-        success: false,
-        message: 'Invalid License'
-    });
-
+  res.send('Xport USB Server Running');
 });
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
-    console.log('Server Running');
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`);
 });
